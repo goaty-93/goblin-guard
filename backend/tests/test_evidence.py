@@ -27,6 +27,13 @@ class EvidenceTests(unittest.TestCase):
         self.assertEqual(first.as_of.isoformat(), "2026-08-28T14:59:00+00:00")
         self.assertEqual(first.proposal_view()["bars"][-1]["close"], "191.8")
 
+    def test_evidence_id_survives_json_round_trip(self):
+        first = build_evidence_packet(symbol="AAPL",feed="iex",fetched_at=NOW,raw_bars=BARS)
+        view = json.loads(json.dumps(first.proposal_view()))
+        rebuilt = [{"t":b["timestamp"],"o":b["open"],"h":b["high"],"l":b["low"],"c":b["close"],"v":b["volume"],"n":b["trade_count"],"vw":b["vwap"]} for b in view["bars"]]
+        second = build_evidence_packet(symbol="AAPL",feed="iex",fetched_at=NOW,raw_bars=rebuilt)
+        self.assertEqual(first.evidence_id,second.evidence_id)
+
     def test_malformed_ohlc_is_rejected(self):
         malformed = [{**BARS[0], "l": 200.0}]
         with self.assertRaises(EvidenceValidationError):
@@ -56,6 +63,19 @@ class EvidenceTests(unittest.TestCase):
         with self.assertRaisesRegex(MarketDataUnavailable, "HTTP 401") as caught:
             client.fetch_recent_bars("AAPL", now=NOW)
         self.assertNotIn("test-secret", str(caught.exception))
+
+    def test_empty_current_window_falls_back_to_recent_trading_bars(self):
+        seen = []
+        def opener(request, timeout):
+            seen.append(request.full_url)
+            if len(seen) == 1:
+                return Response(json.dumps({"bars":None,"symbol":"AAPL","next_page_token":None}).encode())
+            return Response(json.dumps({"bars":list(reversed(BARS)),"symbol":"AAPL","next_page_token":None}).encode())
+        packet = AlpacaMarketDataClient(AlpacaMarketDataConfig("key","secret"), opener).fetch_recent_bars("AAPL",now=NOW)
+        self.assertEqual(len(seen),2)
+        self.assertIn("sort=desc",seen[1])
+        self.assertEqual(packet.bars[0].timestamp.isoformat(),"2026-08-28T14:58:00+00:00")
+        self.assertEqual(packet.bars[-1].timestamp.isoformat(),"2026-08-28T14:59:00+00:00")
 
     def test_base_url_is_pinned(self):
         with self.assertRaises(ValueError):

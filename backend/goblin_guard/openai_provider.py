@@ -22,7 +22,7 @@ PROPOSAL_SCHEMA = {
         "schema_version": {"type":"string", "const":"goblin_guard_proposal_v1"},
         "symbol": {"type":"string", "pattern":"^[A-Z][A-Z0-9.]{0,9}$"},
         "action": {"type":"string", "enum":["buy","sell","hold"]},
-        "requested_notional": {"type":"number", "exclusiveMinimum":0},
+        "requested_notional": {"type":"number", "minimum":0},
         "confidence": {"type":"number", "minimum":0, "maximum":1},
         "evidence_refs": {"type":"array", "minItems":1, "items":{"type":"string"}},
         "evidence_as_of": {"type":"string"},
@@ -59,7 +59,7 @@ class OpenAIProposalProvider:
             "instructions": (
                 "You are Goblin Guard's proposal analyst. Use only the supplied evidence packet. "
                 "Return one bounded proposal. Cite only its evidence_id. Never claim to execute, approve, "
-                "or bypass risk controls. If evidence is insufficient, choose hold."
+                "or bypass risk controls. If evidence is insufficient or stale, choose hold and set requested_notional to exactly 0."
             ),
             "input": json.dumps(evidence.proposal_view(), sort_keys=True, separators=(",", ":")),
             "tools": [],
@@ -82,6 +82,19 @@ class OpenAIProposalProvider:
         if not isinstance(payload, dict) or payload.get("status") != "completed":
             raise ProposalProviderUnavailable("OpenAI proposal did not complete")
         output_text = payload.get("output_text")
+        if not isinstance(output_text, str):
+            texts = []
+            for item in payload.get("output", []):
+                if not isinstance(item, dict) or item.get("type") != "message":
+                    continue
+                for content in item.get("content", []):
+                    if not isinstance(content, dict):
+                        continue
+                    if content.get("type") == "refusal":
+                        raise ProposalProviderUnavailable("OpenAI declined to produce a proposal")
+                    if content.get("type") == "output_text" and isinstance(content.get("text"), str):
+                        texts.append(content["text"])
+            output_text = "".join(texts) if texts else None
         if not isinstance(output_text, str):
             raise ProposalProviderUnavailable("OpenAI proposal contained no structured output")
         try:

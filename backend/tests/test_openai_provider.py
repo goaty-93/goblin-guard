@@ -44,6 +44,18 @@ class OpenAIProviderTests(unittest.TestCase):
         with self.assertRaises(ProposalProviderUnavailable):
             OpenAIProposalProvider(OpenAIProposalConfig("key"), opener).propose(self.evidence)
 
+    def test_raw_rest_output_message_is_parsed(self):
+        nested = {"status":"completed","output":[{"type":"message","status":"completed","content":[{"type":"output_text","text":json.dumps(self.candidate()),"annotations":[]}]}]}
+        def opener(request, timeout): return Response(json.dumps(nested).encode())
+        proposal = OpenAIProposalProvider(OpenAIProposalConfig("key"), opener).propose(self.evidence)
+        self.assertEqual(proposal.evidence_refs,(self.evidence.evidence_id,))
+
+    def test_refusal_fails_closed(self):
+        nested = {"status":"completed","output":[{"type":"message","status":"completed","content":[{"type":"refusal","refusal":"No."}]}]}
+        def opener(request, timeout): return Response(json.dumps(nested).encode())
+        with self.assertRaisesRegex(ProposalProviderUnavailable,"declined"):
+            OpenAIProposalProvider(OpenAIProposalConfig("key"), opener).propose(self.evidence)
+
     def test_incomplete_response_fails_closed(self):
         def opener(request, timeout):
             return Response(json.dumps({"status":"incomplete","output_text":""}).encode())

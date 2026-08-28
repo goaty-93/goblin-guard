@@ -112,6 +112,10 @@ def build_evidence_packet(*, symbol: str, feed: str, fetched_at: datetime, raw_b
         raise EvidenceValidationError("at least one bar is required")
     if tuple(sorted(bar.timestamp for bar in bars)) != tuple(bar.timestamp for bar in bars):
         raise EvidenceValidationError("bars must be sorted oldest to newest")
-    canonical = json.dumps({"symbol": symbol, "feed": feed, "source": source, "bars": raw_items}, sort_keys=True, separators=(",", ":"), default=str)
+    canonical_bars = [
+        {"timestamp":bar.timestamp.isoformat(),"open":str(bar.open),"high":str(bar.high),"low":str(bar.low),"close":str(bar.close),"volume":bar.volume,"trade_count":bar.trade_count,"vwap":str(bar.vwap)}
+        for bar in bars
+    ]
+    canonical = json.dumps({"symbol": symbol, "feed": feed, "source": source, "bars": canonical_bars}, sort_keys=True, separators=(",", ":"))
     digest = hashlib.sha256(canonical.encode("utf-8")).hexdigest()[:16]
     return EvidencePacket(f"bars:{symbol}:{bars[-1].timestamp.strftime('%Y%m%dT%H%M%SZ')}:{digest}", symbol, feed, source, fetched_at.astimezone(timezone.utc), bars[-1].timestamp, bars)

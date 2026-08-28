@@ -43,19 +43,27 @@ class AlpacaMarketDataClient:
         if not 5 <= minutes <= 240:
             raise ValueError("minutes must be between 5 and 240")
         fetched_at = (now or datetime.now(timezone.utc)).astimezone(timezone.utc)
-        start = fetched_at - timedelta(minutes=minutes)
-        params = urlencode({"timeframe":"1Min","start":start.isoformat().replace("+00:00","Z"),"end":fetched_at.isoformat().replace("+00:00","Z"),"limit":minutes,"adjustment":"raw","feed":self.config.feed,"sort":"asc"})
-        url = f"{self.config.base_url.rstrip('/')}/v2/stocks/{symbol}/bars?{params}"
-        request = Request(url, headers={"APCA-API-KEY-ID":self.config.api_key,"APCA-API-SECRET-KEY":self.config.api_secret,"Accept":"application/json"})
-        try:
-            with self._opener(request, timeout=self.config.timeout_seconds) as response:
-                payload = json.load(response)
-        except HTTPError as exc:
-            raise MarketDataUnavailable(f"Alpaca market data returned HTTP {exc.code}") from None
-        except (URLError, TimeoutError, json.JSONDecodeError):
-            raise MarketDataUnavailable("Alpaca market data is unavailable") from None
+        def load(start: datetime, sort: str) -> Any:
+            params = urlencode({"timeframe":"1Min","start":start.isoformat().replace("+00:00","Z"),"end":fetched_at.isoformat().replace("+00:00","Z"),"limit":minutes,"adjustment":"raw","feed":self.config.feed,"sort":sort})
+            url = f"{self.config.base_url.rstrip('/')}/v2/stocks/{symbol}/bars?{params}"
+            request = Request(url, headers={"APCA-API-KEY-ID":self.config.api_key,"APCA-API-SECRET-KEY":self.config.api_secret,"Accept":"application/json"})
+            try:
+                with self._opener(request, timeout=self.config.timeout_seconds) as response:
+                    return json.load(response)
+            except HTTPError as exc:
+                raise MarketDataUnavailable(f"Alpaca market data returned HTTP {exc.code}") from None
+            except (URLError, TimeoutError, json.JSONDecodeError):
+                raise MarketDataUnavailable("Alpaca market data is unavailable") from None
+
+        payload = load(fetched_at - timedelta(minutes=minutes), "asc")
+        if isinstance(payload, dict) and payload.get("bars") is None:
+            payload = load(fetched_at - timedelta(days=7), "desc")
+            if isinstance(payload, dict) and isinstance(payload.get("bars"), list):
+                payload["bars"].reverse()
         if not isinstance(payload, dict) or not isinstance(payload.get("bars"), list):
             raise MarketDataUnavailable("Alpaca market data returned an invalid response")
+        if not payload["bars"]:
+            raise MarketDataUnavailable("Alpaca market data returned no bars")
         try:
             return build_evidence_packet(symbol=symbol, feed=self.config.feed, fetched_at=fetched_at, raw_bars=payload["bars"])
         except EvidenceValidationError as exc:

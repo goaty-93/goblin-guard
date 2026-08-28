@@ -33,6 +33,12 @@ class GovernorTests(unittest.TestCase):
         with self.assertRaises(ProposalValidationError):
             Proposal.from_untrusted(payload(evidence_refs=["invented"]), {"bars:AAPL:20260828T115500Z"})
 
+    def test_hold_requires_exactly_zero_notional(self):
+        hold = Proposal.from_untrusted(payload(action="hold",requested_notional="0"),{"bars:AAPL:20260828T115500Z"})
+        self.assertEqual(hold.requested_notional,Decimal("0"))
+        with self.assertRaises(ProposalValidationError):
+            Proposal.from_untrusted(payload(action="hold",requested_notional="0.01"),{"bars:AAPL:20260828T115500Z"})
+
     def test_stale_evidence_fails_closed(self):
         decision = self.decide(now=NOW + timedelta(hours=2))
         self.assertTrue(decision.rejected)

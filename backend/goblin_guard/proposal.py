@@ -43,8 +43,12 @@ class Proposal:
             confidence = Decimal(str(payload["confidence"]))
         except (InvalidOperation, ValueError):
             raise ProposalValidationError("notional and confidence must be numeric") from None
-        if not notional.is_finite() or notional <= 0:
-            raise ProposalValidationError("requested_notional must be finite and positive")
+        if not notional.is_finite() or notional < 0:
+            raise ProposalValidationError("requested_notional must be finite and non-negative")
+        if action == "hold" and notional != 0:
+            raise ProposalValidationError("hold proposals must request zero notional")
+        if action != "hold" and notional <= 0:
+            raise ProposalValidationError("buy and sell proposals must request positive notional")
         if not confidence.is_finite() or not Decimal("0") <= confidence <= Decimal("1"):
             raise ProposalValidationError("confidence must be between 0 and 1")
         refs = payload["evidence_refs"]
