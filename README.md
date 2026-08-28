@@ -27,6 +27,12 @@ PYTHONPATH=backend python3 -m goblin_guard.evidence_cli AAPL --synthetic
 
 For live, read-only Alpaca IEX bars, place dedicated paper-account values in an ignored `.env`, export them into your shell, then omit `--synthetic`. Credentials are sent only as request headers and are never included in evidence, logs, URLs, or browser code.
 
+## Proposal and audit boundary
+
+The optional OpenAI provider uses the Responses API with strict JSON Schema output, `store: false`, and an empty tool list. Every returned proposal is validated again locally against the exact evidence ID before the deterministic governor sees it. The orderless workflow appends evidence, proposal, and verdict events to a mode-`0600` JSONL audit log under one stable correlation ID.
+
+The current repository deliberately contains no paper-order adapter implementation.
+
 ## Safety boundary
 
 `evidence -> AI proposal -> schema validation -> deterministic risk governor -> paper-order adapter -> audit trace`
