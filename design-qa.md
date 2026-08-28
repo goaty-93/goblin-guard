@@ -1,0 +1,26 @@
+# Design QA
+
+Reference: `design/guardrail-console-selected.png`
+
+Viewport: 1487 × 1058
+
+## Visual comparison
+
+- Header anatomy, console split, proposal density, guardrail stack, oversized verdict, trace table, and replay call-to-action match the selected direction.
+- The generated shield asset is used as a real raster asset with its white background removed; no placeholder or CSS-drawn branding remains.
+- The implementation deliberately labels the Day 1 experience as a synthetic replay and uses requested notional rather than live share quantity because no broker connection exists yet.
+- Responsive rules collapse the split console to one column below 1000px and simplify trace metadata below 680px.
+
+## Interaction and runtime checks
+
+- Replay switches between a rejected stale/daily-loss case and an approved-with-resize case.
+- The primary control is keyboard-accessible and exposes a loading state.
+- Browser console: no application errors observed.
+- Production build and hosting-contract tests pass.
+
+## Fixes made during QA
+
+- Removed unintended solid backgrounds from decision-trace result text.
+- Added a specific document title, theme colour, and description.
+
+final result: passed
