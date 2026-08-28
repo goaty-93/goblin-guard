@@ -17,6 +17,16 @@ npm run dev
 PYTHONPATH=backend python3 -m unittest discover -s backend/tests -v
 ```
 
+## Build an evidence packet
+
+The committed fixture exercises the same validation and normalization path without credentials:
+
+```bash
+PYTHONPATH=backend python3 -m goblin_guard.evidence_cli AAPL --synthetic
+```
+
+For live, read-only Alpaca IEX bars, place dedicated paper-account values in an ignored `.env`, export them into your shell, then omit `--synthetic`. Credentials are sent only as request headers and are never included in evidence, logs, URLs, or browser code.
+
 ## Safety boundary
 
 `evidence -> AI proposal -> schema validation -> deterministic risk governor -> paper-order adapter -> audit trace`
