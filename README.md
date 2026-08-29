@@ -11,6 +11,14 @@ npm install
 npm run dev
 ```
 
+In a second terminal, run the local orderless API:
+
+```bash
+python3 -m venv .venv
+.venv/bin/pip install -r requirements.txt
+PYTHONPATH=backend .venv/bin/uvicorn goblin_guard.api:app --host 127.0.0.1 --port 8000
+```
+
 ## Run the deterministic governor tests
 
 ```bash

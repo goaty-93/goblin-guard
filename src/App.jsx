@@ -17,16 +17,29 @@ function Metric({ label, value, suffix }) {
 export function App() {
   const [caseName, setCaseName] = useState("rejected");
   const [loading, setLoading] = useState(false);
-  const data = fixtures[caseName];
+  const [apiData, setApiData] = useState(null);
+  const [source, setSource] = useState("bundled synthetic fallback");
+  const data = apiData || fixtures[caseName];
   const failures = useMemo(() => data.guardrails.filter((item) => item.status !== "pass"), [data]);
   void failures;
 
-  function replay() {
+  async function replay() {
     setLoading(true);
-    window.setTimeout(() => {
-      setCaseName((current) => current === "rejected" ? "approved" : "rejected");
+    const next = caseName === "rejected" ? "approved" : "rejected";
+    try {
+      const response = await fetch("/api/evaluations/synthetic", { method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify({scenario:next}) });
+      if (!response.ok) throw new Error("evaluation unavailable");
+      const payload = await response.json();
+      if (payload.error || payload.orderSubmission !== "disabled") throw new Error("unsafe evaluation response");
+      setApiData(payload);
+      setSource("api synthetic workflow");
+    } catch {
+      setApiData(null);
+      setSource("bundled synthetic fallback");
+    } finally {
+      setCaseName(next);
       setLoading(false);
-    }, 650);
+    }
   }
 
   return <main className="console-shell">
@@ -62,6 +75,6 @@ export function App() {
     </section>
 
     <section className="trace-section"><h3>Decision trace</h3><div className="trace-grid"><div className="trace-table">{data.trace.map((row) => <div className={`trace-row ${row.status}`} key={`${row.time}-${row.event}`}><time>{row.time}</time><i></i><strong>{row.event}</strong><span>Guardrail Engine</span><b>{row.result}</b><em>{row.detail}</em></div>)}</div><button className="replay" onClick={replay} disabled={loading}><ArrowClockwise className={loading ? "spinning" : ""} /><strong>{loading ? "Re-evaluating…" : "Replay with fresh evidence"}</strong><span>Load the other synthetic case and re-run deterministic guardrails.</span></button></div></section>
-    <footer className="simulation-banner"><ShieldCheck /> SYNTHETIC REPLAY · NO BROKER CREDENTIALS · NO ORDERS</footer>
+    <footer className="simulation-banner"><ShieldCheck /> SYNTHETIC REPLAY · {source.toUpperCase()} · NO ORDERS</footer>
   </main>;
 }
