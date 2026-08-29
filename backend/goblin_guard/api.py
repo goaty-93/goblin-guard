@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from datetime import datetime, timedelta, timezone
+from dataclasses import replace
 from decimal import Decimal
 import json
 import os
@@ -13,8 +14,10 @@ from pydantic import BaseModel
 
 from .audit import JsonlAuditLog
 from .alpaca_market_data import AlpacaMarketDataClient, AlpacaMarketDataConfig, MarketDataUnavailable
+from .alpaca_clock import AlpacaClockClient, AlpacaClockConfig, MarketClockUnavailable
 from .evidence import EvidencePacket, build_evidence_packet
 from .governor import RiskPolicy
+from .indicators import IndicatorUnavailable, calculate_indicators
 from .proposal import Proposal
 from .openai_provider import OpenAIProposalConfig, OpenAIProposalProvider, ProposalProviderUnavailable
 from .workflow import EvaluationContext, evaluate_evidence
@@ -97,14 +100,17 @@ def _present_live(symbol: str) -> dict:
         raise HTTPException(status_code=503,detail={"error":"live read-only evaluation is not configured","order_submission":"disabled"})
     now = datetime.now(timezone.utc)
     try:
+        clock = AlpacaClockClient(AlpacaClockConfig(alpaca_key,alpaca_secret)).fetch()
         evidence = AlpacaMarketDataClient(AlpacaMarketDataConfig(alpaca_key,alpaca_secret)).fetch_recent_bars(symbol,now=now)
+        indicators = calculate_indicators(evidence.bars)
+        evidence = replace(evidence, analysis_context={"technical_indicators":indicators.proposal_view(),"market_clock":clock.proposal_view()})
         provider = OpenAIProposalProvider(OpenAIProposalConfig(openai_key))
         policy = RiskPolicy(frozenset({"AAPL","MSFT"}),Decimal("250"),Decimal("-1.5"),timedelta(minutes=60))
         with tempfile.TemporaryDirectory(prefix="goblin-guard-live-") as directory:
             audit_path = Path(directory)/"audit.jsonl"
-            result = evaluate_evidence(evidence=evidence,provider=provider,policy=policy,context=EvaluationContext(now,Decimal("0"),True,False),audit_log=JsonlAuditLog(audit_path))
+            result = evaluate_evidence(evidence=evidence,provider=provider,policy=policy,context=EvaluationContext(now,Decimal("0"),True,False,clock.is_open),audit_log=JsonlAuditLog(audit_path))
             audit = [json.loads(line) for line in audit_path.read_text().splitlines()]
-    except (MarketDataUnavailable, ProposalProviderUnavailable) as exc:
+    except (MarketDataUnavailable, MarketClockUnavailable, IndicatorUnavailable, ProposalProviderUnavailable) as exc:
         raise HTTPException(status_code=503,detail={"error":str(exc),"order_submission":"disabled"}) from None
     checks = []
     for check in result.decision.guardrails:
@@ -121,9 +127,10 @@ def _present_live(symbol: str) -> dict:
         "id":result.correlation_id.upper(),"symbol":symbol,"company":"Live Alpaca IEX evidence","action":result.proposal.action.upper(),
         "requestedNotional":f"{result.proposal.requested_notional:,.3f}".rstrip("0").rstrip("."),"approvedNotional":f"{result.decision.approved_notional:,.0f}","limitPrice":str(latest.close),
         "confidence":f"{result.proposal.confidence*100:.0f}%","dataAsOf":evidence.as_of.strftime("%d %b %Y %H:%M UTC"),"stale":any(check.name == "evidence_freshness" and not check.passed for check in result.decision.guardrails),
-        "rationale":result.proposal.rationale_summary,"metrics":{"lastPrice":str(latest.close),"ema20":"N/A","rsi":"N/A","volume":str(latest.volume),"atr":str(latest.high-latest.low)},
+        "rationale":result.proposal.rationale_summary,"metrics":{"lastPrice":str(latest.close),"ema20":str(indicators.ema20),"rsi":str(indicators.rsi14),"volume":f"{indicators.volume_ratio20}×","atr":str(indicators.atr14)},
         "decision":decision,"decisionReason":"; ".join(failed) if failed else "Deterministic checks passed",
         "guardrails":checks,"trace":trace,"source":"live_read_only_workflow","orderSubmission":result.order_submission,
+        "marketSession":{"isOpen":clock.is_open,"timestamp":clock.proposal_view()["timestamp"],"nextOpen":clock.proposal_view()["next_open"],"nextClose":clock.proposal_view()["next_close"]},
     }
 
 

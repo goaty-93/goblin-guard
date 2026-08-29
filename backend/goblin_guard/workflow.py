@@ -22,6 +22,7 @@ class EvaluationContext:
     daily_return_pct: Decimal
     kill_switch_locked: bool
     paper_mode_verified: bool
+    market_open: bool = True
 
 
 @dataclass(frozen=True)
@@ -40,9 +41,9 @@ def correlation_id_for(evidence: EvidencePacket) -> str:
 
 def evaluate_evidence(*, evidence: EvidencePacket, provider: ProposalProvider, policy: RiskPolicy, context: EvaluationContext, audit_log: JsonlAuditLog) -> WorkflowResult:
     correlation_id = correlation_id_for(evidence)
-    audit_log.append(AuditEvent(correlation_id, "evidence_built", context.now, {"evidence_id":evidence.evidence_id,"symbol":evidence.symbol,"feed":evidence.feed,"as_of":evidence.as_of}))
+    audit_log.append(AuditEvent(correlation_id, "evidence_built", context.now, {"evidence_id":evidence.evidence_id,"symbol":evidence.symbol,"feed":evidence.feed,"as_of":evidence.as_of,"analysis_context":evidence.analysis_context}))
     proposal = provider.propose(evidence)
     audit_log.append(AuditEvent(correlation_id, "proposal_validated", datetime.now(timezone.utc), {"symbol":proposal.symbol,"action":proposal.action,"requested_notional":proposal.requested_notional,"evidence_refs":list(proposal.evidence_refs)}))
-    decision = evaluate_proposal(proposal=proposal, policy=policy, now=context.now, daily_return_pct=context.daily_return_pct, kill_switch_locked=context.kill_switch_locked, broker_paper_verified=context.paper_mode_verified)
+    decision = evaluate_proposal(proposal=proposal, policy=policy, now=context.now, daily_return_pct=context.daily_return_pct, kill_switch_locked=context.kill_switch_locked, broker_paper_verified=context.paper_mode_verified, market_open=context.market_open)
     audit_log.append(AuditEvent(correlation_id, "governor_verdict", datetime.now(timezone.utc), {"status":decision.status,"approved_notional":decision.approved_notional,"checks":[{"name":check.name,"passed":check.passed,"detail":check.detail} for check in decision.guardrails],"order_submission":"disabled"}))
     return WorkflowResult(correlation_id, evidence, proposal, decision)

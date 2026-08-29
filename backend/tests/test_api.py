@@ -1,9 +1,12 @@
 import unittest
+from decimal import Decimal
 from unittest import mock
 
 from fastapi.testclient import TestClient
 
 from goblin_guard.api import FixtureProposalProvider, _packet, app
+from goblin_guard.alpaca_clock import MarketClock
+from goblin_guard.indicators import TechnicalIndicators
 
 
 class ApiTests(unittest.TestCase):
@@ -52,13 +55,17 @@ class ApiTests(unittest.TestCase):
     def test_live_endpoint_returns_only_orderless_presentation(self):
         evidence = _packet("approved")
         proposal = FixtureProposalProvider("approved").propose(evidence)
-        with mock.patch.dict("os.environ",{"ALPACA_API_KEY":"key","ALPACA_API_SECRET":"secret","OPENAI_API_KEY":"openai"},clear=True), mock.patch("goblin_guard.api.AlpacaMarketDataClient.fetch_recent_bars",return_value=evidence), mock.patch("goblin_guard.api.OpenAIProposalProvider.propose",return_value=proposal):
+        clock = MarketClock(evidence.fetched_at,False,evidence.fetched_at,evidence.fetched_at)
+        indicators = TechnicalIndicators(Decimal("188.42"),Decimal("58.70"),Decimal("2.18"),Decimal("1.32"))
+        with mock.patch.dict("os.environ",{"ALPACA_API_KEY":"key","ALPACA_API_SECRET":"secret","OPENAI_API_KEY":"openai"},clear=True), mock.patch("goblin_guard.api.AlpacaClockClient.fetch",return_value=clock), mock.patch("goblin_guard.api.AlpacaMarketDataClient.fetch_recent_bars",return_value=evidence), mock.patch("goblin_guard.api.calculate_indicators",return_value=indicators), mock.patch("goblin_guard.api.OpenAIProposalProvider.propose",return_value=proposal):
             response = self.client.post("/api/evaluations/live",json={"symbol":"AAPL"})
         payload = response.json()
         self.assertEqual(response.status_code,200)
         self.assertEqual(payload["source"],"live_read_only_workflow")
         self.assertEqual(payload["orderSubmission"],"disabled")
         self.assertEqual(payload["decision"],"REJECTED")
+        self.assertFalse(payload["marketSession"]["isOpen"])
+        self.assertNotEqual(payload["metrics"]["ema20"],"N/A")
 
 
 if __name__ == "__main__": unittest.main()

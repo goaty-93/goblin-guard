@@ -53,6 +53,11 @@ class GovernorTests(unittest.TestCase):
     def test_unlocked_kill_switch_fails_closed(self):
         self.assertTrue(self.decide(kill_switch_locked=False).rejected)
 
+    def test_closed_market_fails_closed(self):
+        decision = self.decide(market_open=False)
+        self.assertTrue(decision.rejected)
+        self.assertFalse(next(check for check in decision.guardrails if check.name == "market_session").passed)
+
 
 if __name__ == "__main__":
     unittest.main()

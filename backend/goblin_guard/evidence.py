@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from decimal import Decimal, InvalidOperation
 import hashlib
@@ -81,6 +81,7 @@ class EvidencePacket:
     fetched_at: datetime
     as_of: datetime
     bars: tuple[MarketBar, ...]
+    analysis_context: dict[str, Any] = field(default_factory=dict)
 
     def proposal_view(self) -> dict[str, Any]:
         """Return the compact, immutable view permitted at the AI boundary."""
@@ -100,6 +101,7 @@ class EvidencePacket:
                 }
                 for bar in self.bars
             ],
+            "analysis_context": self.analysis_context,
         }
 
 

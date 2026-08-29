@@ -27,3 +27,10 @@ Viewport: 1487 × 1058
 - Added a specific document title, theme colour, and description.
 
 final result: passed
+# Market-session and indicator milestone — 29 August 2026
+
+- Verified the live read-only AAPL path in the rendered console at `http://127.0.0.1:4173/`.
+- Alpaca's paper clock reported the US equities session closed; the deterministic `Market Session` guardrail failed closed.
+- EMA20, RSI14, ATR14, and 20-bar volume ratio rendered from locally calculated, validated Alpaca IEX bars rather than placeholders.
+- The structured proposal selected `HOLD`; the verdict remained `REJECTED`, with `No order submitted` and the footer `LIVE READ-ONLY · LIVE READ-ONLY WORKFLOW · NO ORDERS`.
+- Browser console contained no warnings or errors.

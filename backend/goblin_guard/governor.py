@@ -34,10 +34,11 @@ class Decision:
         return self.status == "rejected"
 
 
-def evaluate_proposal(*, proposal: Proposal, policy: RiskPolicy, now: datetime, daily_return_pct: Decimal, kill_switch_locked: bool, broker_paper_verified: bool) -> Decision:
+def evaluate_proposal(*, proposal: Proposal, policy: RiskPolicy, now: datetime, daily_return_pct: Decimal, kill_switch_locked: bool, broker_paper_verified: bool, market_open: bool = True) -> Decision:
     checks: list[GuardrailResult] = []
     checks.append(GuardrailResult("paper_mode", policy.simulation_only and broker_paper_verified, "Paper-only policy and broker endpoint must both be verified."))
     checks.append(GuardrailResult("kill_switch", kill_switch_locked, "Global kill switch must be safe-locked."))
+    checks.append(GuardrailResult("market_session", market_open, "Alpaca market clock must report the US equities market open."))
     checks.append(GuardrailResult("symbol_universe", proposal.symbol in policy.allowed_symbols, f"{proposal.symbol} must be in the allowed universe."))
     evidence_age = now - proposal.evidence_as_of
     checks.append(GuardrailResult("evidence_freshness", timedelta(0) <= evidence_age <= policy.max_evidence_age, f"Evidence age {evidence_age}; maximum {policy.max_evidence_age}."))
