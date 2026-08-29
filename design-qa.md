@@ -16,6 +16,7 @@ Viewport: 1487 × 1058
 - Replay switches between a rejected stale/daily-loss case and an approved-with-resize case.
 - Replay now executes those cases through the local FastAPI evidence → proposal → governor → audit workflow; the bundled fixtures remain the explicit offline fallback.
 - Browser verification covered both API-backed verdicts and confirmed that the footer stayed `NO ORDERS` with no console warnings or errors.
+- The separate live read-only control was verified with genuine Alpaca IEX evidence and an OpenAI proposal. It rendered `LIVE READ-ONLY`, failed closed on paper-mode verification and stale completed-session data, and kept `NO ORDERS` visible.
 - The primary control is keyboard-accessible and exposes a loading state.
 - Browser console: no application errors observed.
 - Production build and hosting-contract tests pass.

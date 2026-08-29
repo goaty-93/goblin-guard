@@ -3,17 +3,20 @@ from __future__ import annotations
 from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 import json
+import os
 from pathlib import Path
 import tempfile
 
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
 from .audit import JsonlAuditLog
+from .alpaca_market_data import AlpacaMarketDataClient, AlpacaMarketDataConfig, MarketDataUnavailable
 from .evidence import EvidencePacket, build_evidence_packet
 from .governor import RiskPolicy
 from .proposal import Proposal
+from .openai_provider import OpenAIProposalConfig, OpenAIProposalProvider, ProposalProviderUnavailable
 from .workflow import EvaluationContext, evaluate_evidence
 
 
@@ -22,6 +25,10 @@ DEMO_NOW = datetime(2026, 8, 28, 15, 0, tzinfo=timezone.utc)
 
 class EvaluationRequest(BaseModel):
     scenario: str = "approved"
+
+
+class LiveEvaluationRequest(BaseModel):
+    symbol: str = "AAPL"
 
 
 class FixtureProposalProvider:
@@ -84,6 +91,42 @@ def _present(scenario: str) -> dict:
     }
 
 
+def _present_live(symbol: str) -> dict:
+    alpaca_key, alpaca_secret, openai_key = os.getenv("ALPACA_API_KEY",""), os.getenv("ALPACA_API_SECRET",""), os.getenv("OPENAI_API_KEY","")
+    if not alpaca_key or not alpaca_secret or not openai_key:
+        raise HTTPException(status_code=503,detail={"error":"live read-only evaluation is not configured","order_submission":"disabled"})
+    now = datetime.now(timezone.utc)
+    try:
+        evidence = AlpacaMarketDataClient(AlpacaMarketDataConfig(alpaca_key,alpaca_secret)).fetch_recent_bars(symbol,now=now)
+        provider = OpenAIProposalProvider(OpenAIProposalConfig(openai_key))
+        policy = RiskPolicy(frozenset({"AAPL","MSFT"}),Decimal("250"),Decimal("-1.5"),timedelta(minutes=60))
+        with tempfile.TemporaryDirectory(prefix="goblin-guard-live-") as directory:
+            audit_path = Path(directory)/"audit.jsonl"
+            result = evaluate_evidence(evidence=evidence,provider=provider,policy=policy,context=EvaluationContext(now,Decimal("0"),True,False),audit_log=JsonlAuditLog(audit_path))
+            audit = [json.loads(line) for line in audit_path.read_text().splitlines()]
+    except (MarketDataUnavailable, ProposalProviderUnavailable) as exc:
+        raise HTTPException(status_code=503,detail={"error":str(exc),"order_submission":"disabled"}) from None
+    checks = []
+    for check in result.decision.guardrails:
+        status = "pass" if check.passed else ("warn" if check.name == "evidence_freshness" else "fail")
+        checks.append({"label":check.name.replace("_"," ").title(),"detail":check.detail,"status":status})
+    decision = "REJECTED" if result.decision.rejected else "APPROVED"
+    trace = []
+    for index,event in enumerate(audit):
+        status = "fail" if event["event_type"] == "governor_verdict" and result.decision.rejected else "pass"
+        trace.append({"time":now.strftime("%H:%M:")+f"0{index}","event":event["event_type"].replace("_"," ").title(),"status":status,"result":decision if event["event_type"] == "governor_verdict" else "PASS","detail":result.correlation_id})
+    failed = [check.name.replace("_"," ") for check in result.decision.guardrails if not check.passed]
+    latest = evidence.bars[-1]
+    return {
+        "id":result.correlation_id.upper(),"symbol":symbol,"company":"Live Alpaca IEX evidence","action":result.proposal.action.upper(),
+        "requestedNotional":f"{result.proposal.requested_notional:,.3f}".rstrip("0").rstrip("."),"approvedNotional":f"{result.decision.approved_notional:,.0f}","limitPrice":str(latest.close),
+        "confidence":f"{result.proposal.confidence*100:.0f}%","dataAsOf":evidence.as_of.strftime("%d %b %Y %H:%M UTC"),"stale":any(check.name == "evidence_freshness" and not check.passed for check in result.decision.guardrails),
+        "rationale":result.proposal.rationale_summary,"metrics":{"lastPrice":str(latest.close),"ema20":"N/A","rsi":"N/A","volume":str(latest.volume),"atr":str(latest.high-latest.low)},
+        "decision":decision,"decisionReason":"; ".join(failed) if failed else "Deterministic checks passed",
+        "guardrails":checks,"trace":trace,"source":"live_read_only_workflow","orderSubmission":result.order_submission,
+    }
+
+
 app = FastAPI(title="Goblin Guard API", version="0.2.0", docs_url=None, redoc_url=None)
 app.add_middleware(CORSMiddleware,allow_origins=["http://127.0.0.1:4173","http://localhost:4173"],allow_credentials=False,allow_methods=["GET","POST"],allow_headers=["Content-Type"])
 
@@ -98,3 +141,11 @@ def synthetic_evaluation(request: EvaluationRequest):
     if scenario not in {"approved","rejected"}:
         return {"error":"scenario must be approved or rejected","order_submission":"disabled"}
     return _present(scenario)
+
+
+@app.post("/api/evaluations/live")
+def live_evaluation(request: LiveEvaluationRequest):
+    symbol = request.symbol.upper()
+    if symbol not in {"AAPL","MSFT"}:
+        raise HTTPException(status_code=422,detail={"error":"symbol is not in the read-only demo universe","order_submission":"disabled"})
+    return _present_live(symbol)

@@ -41,6 +41,8 @@ The optional OpenAI provider uses the Responses API with strict JSON Schema outp
 
 The current repository deliberately contains no paper-order adapter implementation.
 
+The dashboard also exposes a separate live read-only evaluation for the `AAPL`/`MSFT` demo universe. Credentials remain server-side; the endpoint always evaluates with broker paper mode unverified, returns `orderSubmission: disabled`, and cannot place an order because no order route or adapter exists.
+
 ## Safety boundary
 
 `evidence -> AI proposal -> schema validation -> deterministic risk governor -> paper-order adapter -> audit trace`

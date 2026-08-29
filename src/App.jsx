@@ -17,6 +17,7 @@ function Metric({ label, value, suffix }) {
 export function App() {
   const [caseName, setCaseName] = useState("rejected");
   const [loading, setLoading] = useState(false);
+  const [liveLoading, setLiveLoading] = useState(false);
   const [apiData, setApiData] = useState(null);
   const [source, setSource] = useState("bundled synthetic fallback");
   const data = apiData || fixtures[caseName];
@@ -39,6 +40,21 @@ export function App() {
     } finally {
       setCaseName(next);
       setLoading(false);
+    }
+  }
+
+  async function runLive() {
+    setLiveLoading(true);
+    try {
+      const response = await fetch("/api/evaluations/live", { method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify({symbol:"AAPL"}) });
+      const payload = await response.json();
+      if (!response.ok || payload.error || payload.orderSubmission !== "disabled") throw new Error("live evaluation unavailable");
+      setApiData(payload);
+      setSource("live read-only workflow");
+    } catch {
+      setSource("live unavailable · safe fallback retained");
+    } finally {
+      setLiveLoading(false);
     }
   }
 
@@ -74,7 +90,7 @@ export function App() {
       </aside>
     </section>
 
-    <section className="trace-section"><h3>Decision trace</h3><div className="trace-grid"><div className="trace-table">{data.trace.map((row) => <div className={`trace-row ${row.status}`} key={`${row.time}-${row.event}`}><time>{row.time}</time><i></i><strong>{row.event}</strong><span>Guardrail Engine</span><b>{row.result}</b><em>{row.detail}</em></div>)}</div><button className="replay" onClick={replay} disabled={loading}><ArrowClockwise className={loading ? "spinning" : ""} /><strong>{loading ? "Re-evaluating…" : "Replay with fresh evidence"}</strong><span>Load the other synthetic case and re-run deterministic guardrails.</span></button></div></section>
-    <footer className="simulation-banner"><ShieldCheck /> SYNTHETIC REPLAY · {source.toUpperCase()} · NO ORDERS</footer>
+    <section className="trace-section"><h3>Decision trace</h3><div className="trace-grid"><div className="trace-table">{data.trace.map((row) => <div className={`trace-row ${row.status}`} key={`${row.time}-${row.event}`}><time>{row.time}</time><i></i><strong>{row.event}</strong><span>Guardrail Engine</span><b>{row.result}</b><em>{row.detail}</em></div>)}</div><div className="replay-stack"><button className="replay" onClick={replay} disabled={loading || liveLoading}><ArrowClockwise className={loading ? "spinning" : ""} /><strong>{loading ? "Re-evaluating…" : "Replay with fresh evidence"}</strong><span>Load the other synthetic case and re-run deterministic guardrails.</span></button><button className="live-run" onClick={runLive} disabled={loading || liveLoading}>{liveLoading ? "Running read-only evaluation…" : "Run live read-only evaluation"}<small>Alpaca IEX → OpenAI proposal → governor</small></button></div></div></section>
+    <footer className="simulation-banner"><ShieldCheck /> {source.startsWith("live read-only") ? "LIVE READ-ONLY" : "SYNTHETIC REPLAY"} · {source.toUpperCase()} · NO ORDERS</footer>
   </main>;
 }
