@@ -4,7 +4,7 @@
 
 Goblin Guard is an explainable, paper-trading-only prototype for the Alpaca AI Trading Agents Hackathon. It turns validated market evidence into a schema-constrained AI proposal, then independently approves, resizes, or rejects that proposal using deterministic policy.
 
-> **Safety status:** order submission is disabled. This repository has no broker-order adapter and no order endpoint. It is a research and demonstration project, not financial advice or a production trading system.
+> **Safety status:** order submission is disabled by default. A narrowly scoped Alpaca paper-order adapter exists for tested, explicit use, but it is not connected to any HTTP endpoint or public control. This is a research and demonstration project, not financial advice or a production trading system.
 
 ## What works today
 
@@ -16,6 +16,7 @@ Goblin Guard is an explainable, paper-trading-only prototype for the Alpaca AI T
 - Applies deterministic paper-mode, kill-switch, market-session, universe, freshness, daily-loss, and size checks.
 - Records evidence, proposal, and verdict events in an append-only, mode-`0600` JSONL audit trace.
 - Provides synthetic approved/resized and rejected replays plus a live read-only AAPL/MSFT evaluation.
+- Contains a disabled-by-default paper adapter with paper-host pinning, account/asset preflight checks, deterministic client order IDs, duplicate prevention, reconciliation, and correlated audit events.
 
 ## Trust boundary
 
@@ -27,7 +28,7 @@ validated evidence
   -> verdict and audit trace
 ```
 
-There is intentionally no final order-submission step. The model receives neither broker credentials nor execution tools, and it cannot change policy, write audit history, or authorize itself.
+The model receives neither broker credentials nor execution tools, and it cannot change policy, write audit history, authorize itself, or invoke the paper adapter. The adapter accepts only a completed approved/resized `WorkflowResult` and still requires an explicit local enable flag.
 
 ## Requirements
 
@@ -121,7 +122,7 @@ PYTHONPATH=backend .venv/bin/python -m goblin_guard.evidence_cli AAPL --syntheti
 | `POST` | `/api/evaluations/synthetic` | Approved/resized or rejected replay |
 | `POST` | `/api/evaluations/live` | Read-only AAPL/MSFT evidence and proposal evaluation |
 
-No `/api/orders` route is implemented.
+No `/api/orders` route is implemented. The paper adapter is a backend library boundary, not a browser-accessible capability.
 
 ## Repository structure
 
@@ -135,7 +136,7 @@ No `/api/orders` route is implemented.
 
 See [SECURITY.md](SECURITY.md) for credential handling and vulnerability reporting. Third-party packages are listed in [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) and locked by `package-lock.json` and `requirements.txt`.
 
-Current limitations include a small demonstration universe, no authentication, ephemeral API audit files, no persisted decision browser, no account/position reads, and no order submission or reconciliation. The live workflow is designed to fail closed when credentials, evidence, clock state, or model output are unavailable or invalid.
+Current limitations include a small demonstration universe, no authentication, ephemeral API audit files, no persisted decision browser, and no browser/API order control. The live workflow is designed to fail closed when credentials, evidence, clock state, or model output are unavailable or invalid. Paper submission remains disabled and has not been exercised against Alpaca from this repository.
 
 ## Licence
 

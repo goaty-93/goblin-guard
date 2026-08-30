@@ -2,7 +2,7 @@
 
 ## Prototype scope
 
-Goblin Guard is a paper-trading-only hackathon prototype. Order submission is disabled, and the repository intentionally contains no broker-order adapter or order endpoint.
+Goblin Guard is a paper-trading-only hackathon prototype. Order submission is disabled by default. The paper adapter is not connected to an HTTP endpoint or public control and accepts only a deterministic approved/resized workflow result.
 
 ## Credential handling
 
@@ -12,6 +12,8 @@ Goblin Guard is a paper-trading-only hackathon prototype. Order submission is di
 - Rotate a credential immediately if it may have been exposed.
 
 The live API keeps credentials server-side. Alpaca requests use authentication headers, and the OpenAI request exposes no broker tools or credentials.
+
+The paper adapter pins the exact Alpaca paper host, preflights account and asset state, uses deterministic client order IDs, checks for an existing order before POST, and reconciles ambiguous outcomes without retrying submission. A production deployment would require additional authentication, authorization, durable audit storage, operational monitoring, and account-specific controls.
 
 ## Reporting a vulnerability
 
