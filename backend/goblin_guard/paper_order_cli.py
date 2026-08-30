@@ -61,7 +61,7 @@ def preview(result: WorkflowResult, *, synthetic: bool) -> dict[str, str | bool]
         "requested_notional": str(result.proposal.requested_notional),
         "governor_status": result.decision.status,
         "approved_notional": str(result.decision.approved_notional),
-        "order_submission": "disabled" if synthetic else "confirmation_required",
+        "order_submission": "disabled" if synthetic or result.decision.rejected else "confirmation_required",
     }
 
 

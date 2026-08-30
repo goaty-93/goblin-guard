@@ -34,5 +34,16 @@ class PaperOrderCliTests(unittest.TestCase):
         self.assertEqual(document["order_submission"],"disabled")
         self.assertEqual(document["approved_notional"],"1")
 
+    def test_rejected_live_preview_disables_submission(self):
+        evidence = _packet("approved")
+        result = evaluate_evidence(
+            evidence=evidence, provider=FixtureProposalProvider("approved"),
+            policy=RiskPolicy(frozenset({"AAPL"}),Decimal("1"),Decimal("-1.5"),timedelta(minutes=60)),
+            context=EvaluationContext(DEMO_NOW,Decimal("-1.5"),True,True,True),
+            audit_log=JsonlAuditLog(f"/tmp/gg-cli-rejected-{id(self)}.jsonl"),
+        )
+        self.assertTrue(result.decision.rejected)
+        self.assertEqual(preview(result,synthetic=False)["order_submission"],"disabled")
+
 
 if __name__ == "__main__": unittest.main()
