@@ -114,6 +114,25 @@ Build a credential-free evidence packet directly:
 PYTHONPATH=backend .venv/bin/python -m goblin_guard.evidence_cli AAPL --synthetic
 ```
 
+## Operator-only paper-order rehearsal
+
+The paper-order command defaults to preview-only behavior and caps the governor-approved notional at `$1.00`. Rehearse the complete approval and client-order-ID flow without credentials or broker access:
+
+```bash
+PYTHONPATH=backend .venv/bin/python -m goblin_guard.paper_order_cli --synthetic
+```
+
+Prepare a live read-only proposal and verdict without submitting it:
+
+```bash
+set -a
+source .env
+set +a
+PYTHONPATH=backend .venv/bin/python -m goblin_guard.paper_order_cli --symbol AAPL
+```
+
+The command will exit without submission when the market is closed or any governor check fails. Actual paper submission additionally requires `--execute` and typing the complete deterministic client order ID displayed by that same run. Synthetic mode can never be combined with `--execute`. Do not use the execution flag with live brokerage credentials.
+
 ## API surface
 
 | Method | Path | Purpose |

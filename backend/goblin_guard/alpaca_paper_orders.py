@@ -48,6 +48,21 @@ class PaperOrderReceipt:
     request_id: str | None = None
 
 
+@dataclass(frozen=True)
+class PaperAccountSnapshot:
+    status: str
+    trading_blocked: bool
+    equity: Decimal
+    last_equity: Decimal
+    buying_power: Decimal
+
+    @property
+    def daily_return_pct(self) -> Decimal:
+        if self.last_equity <= 0:
+            raise PaperOrderError("Alpaca paper account last equity is invalid")
+        return ((self.equity - self.last_equity) / self.last_equity) * Decimal(100)
+
+
 def client_order_id_for(result: WorkflowResult) -> str:
     return f"{result.correlation_id}-v1"
 
@@ -89,6 +104,30 @@ class AlpacaPaperOrderAdapter:
             raise PaperOrderError("Alpaca paper account is blocked from trading")
         if payload.get("status") not in {"ACTIVE", "PAPER_ONLY"}:
             raise PaperOrderError("Alpaca paper account is not active")
+
+    def account_snapshot(self) -> PaperAccountSnapshot:
+        request = Request(f"{self.config.base_url}/v2/account", headers=self._headers, method="GET")
+        try:
+            payload, _ = self._load(request)
+        except HTTPError as exc:
+            raise PaperOrderError(f"Alpaca paper account check returned HTTP {exc.code}") from None
+        except (URLError, TimeoutError, json.JSONDecodeError):
+            raise PaperOrderError("Alpaca paper account check is unavailable") from None
+        if not isinstance(payload, dict) or type(payload.get("trading_blocked")) is not bool:
+            raise PaperOrderError("Alpaca paper account returned an invalid response")
+        try:
+            snapshot = PaperAccountSnapshot(
+                str(payload["status"]), payload["trading_blocked"],
+                Decimal(str(payload["equity"])), Decimal(str(payload["last_equity"])),
+                Decimal(str(payload["buying_power"])),
+            )
+        except (KeyError, ValueError, ArithmeticError):
+            raise PaperOrderError("Alpaca paper account returned an invalid response") from None
+        if snapshot.status not in {"ACTIVE", "PAPER_ONLY"} or snapshot.trading_blocked:
+            raise PaperOrderError("Alpaca paper account is not active for trading")
+        if min(snapshot.equity, snapshot.last_equity, snapshot.buying_power) < 0:
+            raise PaperOrderError("Alpaca paper account returned an invalid response")
+        return snapshot
 
     def _verify_asset(self, symbol: str) -> None:
         request = Request(f"{self.config.base_url}/v2/assets/{quote(symbol, safe='')}", headers=self._headers, method="GET")
