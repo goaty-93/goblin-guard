@@ -59,7 +59,9 @@ class OpenAIProposalProvider:
             "instructions": (
                 "You are Goblin Guard's proposal analyst. Use only the supplied evidence packet. "
                 "Return one bounded proposal. Cite only its evidence_id. Never claim to execute, approve, "
-                "or bypass risk controls. If evidence is insufficient or stale, choose hold and set requested_notional to exactly 0."
+                "or bypass risk controls. Treat proposal_constraints as limits on the proposal, not as market evidence. "
+                "The deterministic governor independently checks and may resize or reject any proposal, so lack of execution authority "
+                "is not itself a reason to hold. If market evidence is insufficient or stale, choose hold and set requested_notional to exactly 0."
             ),
             "input": json.dumps(evidence.proposal_view(), sort_keys=True, separators=(",", ":")),
             "tools": [],

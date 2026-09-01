@@ -14,6 +14,7 @@ class RiskPolicy:
     daily_loss_limit_pct: Decimal
     max_evidence_age: timedelta
     simulation_only: bool = True
+    allowed_actions: frozenset[str] = frozenset({"buy", "hold"})
 
 
 @dataclass(frozen=True)
@@ -40,6 +41,7 @@ def evaluate_proposal(*, proposal: Proposal, policy: RiskPolicy, now: datetime, 
     checks.append(GuardrailResult("kill_switch", kill_switch_locked, "Global kill switch must be safe-locked."))
     checks.append(GuardrailResult("market_session", market_open, "Alpaca market clock must report the US equities market open."))
     checks.append(GuardrailResult("symbol_universe", proposal.symbol in policy.allowed_symbols, f"{proposal.symbol} must be in the allowed universe."))
+    checks.append(GuardrailResult("action_policy", proposal.action in policy.allowed_actions, f"{proposal.action} must be allowed by the long-only action policy."))
     evidence_age = now - proposal.evidence_as_of
     checks.append(GuardrailResult("evidence_freshness", timedelta(0) <= evidence_age <= policy.max_evidence_age, f"Evidence age {evidence_age}; maximum {policy.max_evidence_age}."))
     checks.append(GuardrailResult("daily_loss", daily_return_pct > policy.daily_loss_limit_pct, f"Daily return {daily_return_pct}% must be above {policy.daily_loss_limit_pct}%."))

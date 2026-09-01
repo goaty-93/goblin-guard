@@ -20,12 +20,28 @@ from .openai_provider import OpenAIProposalConfig, OpenAIProposalProvider, Propo
 from .workflow import EvaluationContext, WorkflowResult, evaluate_evidence
 
 
+DEMO_UNIVERSE = ("AAPL", "MSFT", "AMZN", "GOOGL", "META", "NVDA")
+
+
 def _credentials() -> tuple[str, str, str]:
     return os.getenv("ALPACA_API_KEY", ""), os.getenv("ALPACA_API_SECRET", ""), os.getenv("OPENAI_API_KEY", "")
 
 
+def proposal_analysis_context(*, indicators: dict, market_clock: dict) -> dict:
+    return {
+        "technical_indicators": indicators,
+        "market_clock": market_clock,
+        "proposal_constraints": {
+            "paper_only": True,
+            "position_intent": "new long entry only",
+            "allowed_actions": ["buy", "hold"],
+            "maximum_requested_notional_usd": "1.00",
+        },
+    }
+
+
 def prepare_result(*, symbol: str, synthetic: bool, audit_log: JsonlAuditLog) -> WorkflowResult:
-    policy = RiskPolicy(frozenset({"AAPL", "MSFT"}), Decimal("1.00"), Decimal("-1.5"), timedelta(minutes=60))
+    policy = RiskPolicy(frozenset(DEMO_UNIVERSE), Decimal("1.00"), Decimal("-1.5"), timedelta(minutes=60))
     if synthetic:
         evidence = _packet("approved")
         return evaluate_evidence(
@@ -43,7 +59,7 @@ def prepare_result(*, symbol: str, synthetic: bool, audit_log: JsonlAuditLog) ->
     clock = AlpacaClockClient(AlpacaClockConfig(alpaca_key, alpaca_secret)).fetch()
     evidence = AlpacaMarketDataClient(AlpacaMarketDataConfig(alpaca_key, alpaca_secret)).fetch_recent_bars(symbol, now=now)
     indicators = calculate_indicators(evidence.bars)
-    evidence = replace(evidence, analysis_context={"technical_indicators":indicators.proposal_view(),"market_clock":clock.proposal_view()})
+    evidence = replace(evidence,analysis_context=proposal_analysis_context(indicators=indicators.proposal_view(),market_clock=clock.proposal_view()))
     provider = OpenAIProposalProvider(OpenAIProposalConfig(openai_key))
     return evaluate_evidence(
         evidence=evidence, provider=provider, policy=policy,
@@ -81,7 +97,7 @@ def confirmation_matches(expected: str, entered: str) -> bool:
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="Prepare or explicitly submit one guarded Alpaca paper order.")
-    parser.add_argument("--symbol", choices=("AAPL", "MSFT"), default="AAPL")
+    parser.add_argument("--symbol", choices=DEMO_UNIVERSE, default="AAPL")
     parser.add_argument("--synthetic", action="store_true", help="Run a credential-free rehearsal; submission is impossible.")
     parser.add_argument("--execute", action="store_true", help="Permit one confirmed POST to the pinned Alpaca paper endpoint.")
     parser.add_argument("--audit-path", default="audit/paper-orders.jsonl")

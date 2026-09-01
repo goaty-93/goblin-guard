@@ -15,7 +15,8 @@ Goblin Guard is an explainable, paper-trading-only prototype for the Alpaca AI T
 - Revalidates every model response against the exact evidence identifier.
 - Applies deterministic paper-mode, kill-switch, market-session, universe, freshness, daily-loss, and size checks.
 - Records evidence, proposal, and verdict events in an append-only, mode-`0600` JSONL audit trace.
-- Provides synthetic approved/resized and rejected replays plus a live read-only AAPL/MSFT evaluation.
+- Provides synthetic approved/resized and rejected replays plus live read-only evaluation across a fixed six-symbol universe.
+- Scans AAPL, MSFT, AMZN, GOOGL, META, and NVDA once each, shows every outcome, and deterministically nominates at most one eligible long-only candidate.
 - Contains a disabled-by-default paper adapter with paper-host pinning, account/asset preflight checks, deterministic client order IDs, duplicate prevention, reconciliation, and correlated audit events.
 
 ## Trust boundary
@@ -82,7 +83,7 @@ set +a
 PYTHONPATH=backend .venv/bin/uvicorn goblin_guard.api:app --host 127.0.0.1 --port 8000
 ```
 
-The browser never receives these credentials. Alpaca credentials are sent in request headers, not URLs or evidence. The live endpoint supports only `AAPL` and `MSFT`, always treats broker paper mode as unverified, and always returns `orderSubmission: disabled`.
+The browser never receives these credentials. Alpaca credentials are sent in request headers, not URLs or evidence. The browser live endpoint supports only `AAPL` and `MSFT`, always treats broker paper mode as unverified, and always returns `orderSubmission: disabled`. The wider six-symbol scan is operator-only.
 
 ## Verification
 
@@ -130,6 +131,17 @@ source .env
 set +a
 PYTHONPATH=backend .venv/bin/python -m goblin_guard.paper_order_cli --symbol AAPL
 ```
+
+Scan the fixed six-symbol universe and nominate at most one eligible candidate:
+
+```bash
+set -a
+source .env
+set +a
+PYTHONPATH=backend .venv/bin/python -m goblin_guard.paper_scan_cli
+```
+
+The scan has no execution option and cannot submit an order. It evaluates every symbol once against one account/clock snapshot, displays failures as well as holds/rejections, and selects by highest confidence then ticker symbol. A later order still requires a fresh single-symbol run and its separate explicit confirmation.
 
 The command will exit without submission when the market is closed or any governor check fails. Actual paper submission additionally requires `--execute` and typing the complete deterministic client order ID displayed by that same run. Synthetic mode can never be combined with `--execute`. Do not use the execution flag with live brokerage credentials.
 

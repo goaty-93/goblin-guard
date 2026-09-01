@@ -36,6 +36,7 @@ class OpenAIProviderTests(unittest.TestCase):
         self.assertEqual(seen["body"]["tool_choice"], "none")
         self.assertFalse(seen["body"]["store"])
         self.assertTrue(seen["body"]["text"]["format"]["strict"])
+        self.assertIn("not itself a reason to hold",seen["body"]["instructions"])
         self.assertNotIn("test-openai-key", json.dumps(seen["body"]))
 
     def test_unknown_evidence_reference_fails_closed(self):

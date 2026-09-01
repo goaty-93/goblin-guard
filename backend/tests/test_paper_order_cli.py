@@ -2,7 +2,7 @@ from decimal import Decimal
 import unittest
 
 from goblin_guard.alpaca_paper_orders import PaperAccountSnapshot
-from goblin_guard.paper_order_cli import confirmation_matches, preview, submission_eligible
+from goblin_guard.paper_order_cli import confirmation_matches, preview, proposal_analysis_context, submission_eligible
 from goblin_guard.api import FixtureProposalProvider, _packet
 from goblin_guard.audit import JsonlAuditLog
 from goblin_guard.governor import RiskPolicy
@@ -12,6 +12,12 @@ from datetime import timedelta
 
 
 class PaperOrderCliTests(unittest.TestCase):
+    def test_proposal_context_supplies_limits_without_execution_authority(self):
+        context = proposal_analysis_context(indicators={"rsi14":"55"},market_clock={"is_open":True})
+        self.assertEqual(context["proposal_constraints"]["allowed_actions"],["buy","hold"])
+        self.assertEqual(context["proposal_constraints"]["maximum_requested_notional_usd"],"1.00")
+        self.assertNotIn("submission",context["proposal_constraints"])
+
     def test_confirmation_requires_exact_full_client_order_id(self):
         expected = "gg-123-v1"
         self.assertTrue(confirmation_matches(expected, expected))

@@ -58,6 +58,15 @@ class GovernorTests(unittest.TestCase):
         self.assertTrue(decision.rejected)
         self.assertFalse(next(check for check in decision.guardrails if check.name == "market_session").passed)
 
+    def test_sell_is_rejected_by_default_long_only_policy(self):
+        sell = Proposal.from_untrusted(
+            payload(action="sell", requested_notional="100"),
+            {"bars:AAPL:20260828T115500Z"},
+        )
+        decision = self.decide(proposal=sell)
+        self.assertTrue(decision.rejected)
+        self.assertFalse(next(check for check in decision.guardrails if check.name == "action_policy").passed)
+
 
 if __name__ == "__main__":
     unittest.main()
