@@ -52,6 +52,7 @@ def prepare_result(*, symbol: str, synthetic: bool, audit_log: JsonlAuditLog) ->
 
 
 def preview(result: WorkflowResult, *, synthetic: bool) -> dict[str, str | bool]:
+    eligible = submission_eligible(result)
     return {
         "mode": "synthetic_rehearsal" if synthetic else "live_paper",
         "correlation_id": result.correlation_id,
@@ -61,8 +62,17 @@ def preview(result: WorkflowResult, *, synthetic: bool) -> dict[str, str | bool]
         "requested_notional": str(result.proposal.requested_notional),
         "governor_status": result.decision.status,
         "approved_notional": str(result.decision.approved_notional),
-        "order_submission": "disabled" if synthetic or result.decision.rejected else "confirmation_required",
+        "order_submission": "disabled" if synthetic or not eligible else "confirmation_required",
     }
+
+
+def submission_eligible(result: WorkflowResult) -> bool:
+    return (
+        not result.decision.rejected
+        and result.decision.status in {"approved", "resized"}
+        and result.proposal.action in {"buy", "sell"}
+        and result.decision.approved_notional > 0
+    )
 
 
 def confirmation_matches(expected: str, entered: str) -> bool:
@@ -88,8 +98,8 @@ def main(argv: list[str] | None = None) -> int:
 
     document = preview(result, synthetic=args.synthetic)
     print(json.dumps(document, indent=2, sort_keys=True))
-    if result.decision.rejected:
-        print("Governor rejected the proposal; no order can be submitted.", file=sys.stderr)
+    if not submission_eligible(result):
+        print("Proposal is not an eligible positive-notional buy or sell; no order can be submitted.", file=sys.stderr)
         return 3
     if args.synthetic or not args.execute:
         print("Preview only. No order submitted.")

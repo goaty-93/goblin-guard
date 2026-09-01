@@ -2,7 +2,7 @@ from decimal import Decimal
 import unittest
 
 from goblin_guard.alpaca_paper_orders import PaperAccountSnapshot
-from goblin_guard.paper_order_cli import confirmation_matches, preview
+from goblin_guard.paper_order_cli import confirmation_matches, preview, submission_eligible
 from goblin_guard.api import FixtureProposalProvider, _packet
 from goblin_guard.audit import JsonlAuditLog
 from goblin_guard.governor import RiskPolicy
@@ -43,6 +43,27 @@ class PaperOrderCliTests(unittest.TestCase):
             audit_log=JsonlAuditLog(f"/tmp/gg-cli-rejected-{id(self)}.jsonl"),
         )
         self.assertTrue(result.decision.rejected)
+        self.assertEqual(preview(result,synthetic=False)["order_submission"],"disabled")
+
+    def test_approved_hold_is_never_submission_eligible(self):
+        evidence = _packet("approved")
+        class HoldProvider:
+            def propose(self, evidence):
+                from goblin_guard.proposal import Proposal
+                return Proposal.from_untrusted({
+                    "schema_version":"goblin_guard_proposal_v1","symbol":"AAPL","action":"hold",
+                    "requested_notional":"0","confidence":"0.8","evidence_refs":[evidence.evidence_id],
+                    "evidence_as_of":evidence.as_of.isoformat(),
+                    "rationale_summary":"Evidence does not support a positive-notional paper order at this time.",
+                },{evidence.evidence_id})
+        result = evaluate_evidence(
+            evidence=evidence,provider=HoldProvider(),
+            policy=RiskPolicy(frozenset({"AAPL"}),Decimal("1"),Decimal("-1.5"),timedelta(minutes=60)),
+            context=EvaluationContext(DEMO_NOW,Decimal("0"),True,True,True),
+            audit_log=JsonlAuditLog(f"/tmp/gg-cli-hold-{id(self)}.jsonl"),
+        )
+        self.assertEqual(result.decision.status,"approved")
+        self.assertFalse(submission_eligible(result))
         self.assertEqual(preview(result,synthetic=False)["order_submission"],"disabled")
 
 
