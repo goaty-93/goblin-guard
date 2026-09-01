@@ -49,7 +49,7 @@ class EvidenceTests(unittest.TestCase):
             seen.update(url=request.full_url, headers=dict(request.header_items()), method=request.get_method(), timeout=timeout)
             return Response(json.dumps({"bars":BARS,"symbol":"AAPL","next_page_token":None}).encode())
         client = AlpacaMarketDataClient(AlpacaMarketDataConfig("test-key","test-secret"), opener)
-        packet = client.fetch_recent_bars("AAPL", now=NOW)
+        packet = client.fetch_recent_bars("AAPL", now=NOW, minimum_bars=2)
         self.assertEqual(seen["method"], "GET")
         self.assertIn("/v2/stocks/AAPL/bars?", seen["url"])
         self.assertIn("feed=iex", seen["url"])
@@ -71,11 +71,35 @@ class EvidenceTests(unittest.TestCase):
             if len(seen) == 1:
                 return Response(json.dumps({"bars":None,"symbol":"AAPL","next_page_token":None}).encode())
             return Response(json.dumps({"bars":list(reversed(BARS)),"symbol":"AAPL","next_page_token":None}).encode())
-        packet = AlpacaMarketDataClient(AlpacaMarketDataConfig("key","secret"), opener).fetch_recent_bars("AAPL",now=NOW)
+        packet = AlpacaMarketDataClient(AlpacaMarketDataConfig("key","secret"), opener).fetch_recent_bars("AAPL",now=NOW,minimum_bars=2)
         self.assertEqual(len(seen),2)
         self.assertIn("sort=desc",seen[1])
         self.assertEqual(packet.bars[0].timestamp.isoformat(),"2026-08-28T14:58:00+00:00")
         self.assertEqual(packet.bars[-1].timestamp.isoformat(),"2026-08-28T14:59:00+00:00")
+
+    def test_partial_opening_window_falls_back_for_indicator_warmup(self):
+        seen = []
+        history = []
+        for index in range(30):
+            minute = index + 1
+            history.append({"t":f"2026-08-28T14:{minute:02d}:00Z","o":190.0,"h":191.0,"l":189.0,"c":190.5,"v":1200,"n":45,"vw":190.4})
+        def opener(request, timeout):
+            seen.append(request.full_url)
+            if len(seen) == 1:
+                return Response(json.dumps({"bars":history[-12:],"symbol":"AAPL","next_page_token":None}).encode())
+            return Response(json.dumps({"bars":list(reversed(history)),"symbol":"AAPL","next_page_token":None}).encode())
+        packet = AlpacaMarketDataClient(AlpacaMarketDataConfig("key","secret"),opener).fetch_recent_bars("AAPL",now=NOW)
+        self.assertEqual(len(seen),2)
+        self.assertIn("sort=desc",seen[1])
+        self.assertEqual(len(packet.bars),30)
+        self.assertEqual(packet.as_of.isoformat(),"2026-08-28T14:30:00+00:00")
+
+    def test_fallback_with_insufficient_history_fails_closed(self):
+        def opener(request, timeout):
+            return Response(json.dumps({"bars":BARS,"symbol":"AAPL","next_page_token":None}).encode())
+        client = AlpacaMarketDataClient(AlpacaMarketDataConfig("key","secret"),opener)
+        with self.assertRaisesRegex(MarketDataUnavailable,"fewer than 21"):
+            client.fetch_recent_bars("AAPL",now=NOW)
 
     def test_base_url_is_pinned(self):
         with self.assertRaises(ValueError):
