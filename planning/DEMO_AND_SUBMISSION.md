@@ -25,13 +25,16 @@ The judge should understand the product in the first 30 seconds.
 8. End on paper-account state, kill switch, and replayable decision history.
 
 The winning moment is the contrast: the AI can be persuasive and still be
-overruled by policy.
+overruled by policy. The public demo now opens on a sanitized, verified run:
+six symbols scanned once each, MSFT selected by a fixed ranking rule, a fresh
+human-authorized `$1.00` paper buy, and the reconciled broker fill. The original
+approved/resized and rejected cases remain available under Decision cases.
 
 ## Demo reliability
 
 - Rehearse with the market open and closed.
 - Use deterministic client order IDs and safe cleanup/reconciliation.
-- Prepare one pre-recorded broker-response path for the presentation video.
+- Use the sanitized verified MSFT fill as the pre-recorded broker-response path.
 - Provide a clearly labelled synthetic replay that needs no external API.
 - Never display API keys, account identifiers, private balances, browser
   autofill, or unrelated tabs.
@@ -92,7 +95,8 @@ deterministic risk controls approve, resize, or reject every action.
 - Health endpoint and visible paper-only status pass.
 - At least one approved/resized trace recorded.
 - At least one rejected trace recorded.
-- Alpaca paper order and reconciliation demonstrated.
+- Alpaca paper order and reconciliation demonstrated: MSFT `$1.00`, filled on
+  1 September 2026, with the public receipt sanitized.
 - Kill switch demonstrated.
 - Synthetic fallback replay works without external APIs.
 - Video is MP4, at most five minutes, and contains no sensitive information.

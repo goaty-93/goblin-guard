@@ -19,6 +19,12 @@ Goblin Guard is an explainable, paper-trading-only prototype for the Alpaca AI T
 - Scans AAPL, MSFT, AMZN, GOOGL, META, and NVDA once each, shows every outcome, and deterministically nominates at most one eligible long-only candidate.
 - Contains a disabled-by-default paper adapter with paper-host pinning, account/asset preflight checks, deterministic client order IDs, duplicate prevention, reconciliation, and correlated audit events.
 
+## Verified paper execution
+
+On 1 September 2026, the operator-only workflow scanned the fixed six-symbol universe, selected MSFT by the documented confidence rule, recomputed fresh evidence, received explicit human confirmation, and submitted one `$1.00` Alpaca paper buy. Alpaca filled `0.001976537` MSFT at an average price of `$500.876`. The public demo shows a sanitized receipt tied to commit `f06b426`; it exposes no credentials, account identifier, balance, or order control.
+
+This proves the guarded integration and reconciliation path, not profitability, predictive value, or safe unattended autonomy.
+
 ## Trust boundary
 
 ```text
@@ -167,7 +173,7 @@ No `/api/orders` route is implemented. The paper adapter is a backend library bo
 
 See [SECURITY.md](SECURITY.md) for credential handling and vulnerability reporting. Third-party packages are listed in [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) and locked by `package-lock.json` and `requirements.txt`.
 
-Current limitations include a small demonstration universe, no authentication, ephemeral API audit files, no persisted decision browser, and no browser/API order control. The live workflow is designed to fail closed when credentials, evidence, clock state, or model output are unavailable or invalid. Paper submission remains disabled and has not been exercised against Alpaca from this repository.
+Current limitations include a small demonstration universe, no authentication, ephemeral API audit files, no persisted decision browser, and no browser/API order control. The live workflow is designed to fail closed when credentials, evidence, clock state, or model output are unavailable or invalid. Paper submission remains disabled by default and is available only through the explicit operator CLI; one bounded paper order has been exercised and reconciled.
 
 ## Licence
 

@@ -1,0 +1,14 @@
+{
+  "evaluatedAt": "01 Sep 2026 · 17:26:31 UTC",
+  "commit": "f06b426",
+  "universe": [
+    {"symbol":"AAPL","action":"HOLD","confidence":"84%","status":"No candidate"},
+    {"symbol":"MSFT","action":"BUY","confidence":"70%","status":"Selected"},
+    {"symbol":"AMZN","action":"HOLD","confidence":"82%","status":"No candidate"},
+    {"symbol":"GOOGL","action":"BUY","confidence":"58%","status":"Eligible"},
+    {"symbol":"META","action":"HOLD","confidence":"78%","status":"No candidate"},
+    {"symbol":"NVDA","action":"BUY","confidence":"56%","status":"Eligible"}
+  ],
+  "selectionRule": "Highest-confidence eligible long-only BUY; ticker ascending breaks ties.",
+  "receipt": {"symbol":"MSFT","side":"BUY","notional":"$1.00","status":"FILLED","filledQuantity":"0.001976537","averagePrice":"$500.876","filledAt":"01 Sep 2026 · 17:29:12 UTC","orderId":"bfa02c6b…7ed2","clientOrderId":"gg-29d8…c191-v1"}
+}

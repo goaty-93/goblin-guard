@@ -1,7 +1,9 @@
 import { useMemo, useState } from "react";
-import { ArrowClockwise, CheckCircle, Clock, FileText, GithubLogo, LockKey, ShieldCheck, Warning, XCircle } from "@phosphor-icons/react";
+import { ArrowClockwise, CheckCircle, Clock, FileText, Fingerprint, GithubLogo, LockKey, PaperPlaneTilt, Scan, ShieldCheck, UserCheck, Warning, XCircle } from "@phosphor-icons/react";
 import rejectedFixture from "./fixtures/rejected.json";
 import approvedFixture from "./fixtures/approved-resize.json";
+import verifiedExecution from "./fixtures/verified-execution.json";
+import "./proof.css";
 
 const fixtures = { rejected: rejectedFixture, approved: approvedFixture };
 
@@ -14,6 +16,19 @@ function Metric({ label, value, suffix }) {
   return <div className="metric"><span>{label}</span><strong>{value} <small>{suffix}</small></strong></div>;
 }
 
+function VerifiedRun() {
+  const receipt = verifiedExecution.receipt;
+  return <section className="proof-view" aria-label="Verified paper execution">
+    <div className="proof-hero"><div><span className="eyebrow"><CheckCircle weight="fill" /> VERIFIED PAPER EXECUTION</span><h2>One opportunity. Four independent checkpoints.</h2><p>A sanitized receipt from the operator-only workflow proves that selection, approval, authorization and broker reconciliation work end to end. The public demo cannot repeat the trade.</p></div><div className="proof-stamp"><ShieldCheck weight="duotone" /><strong>FILLED</strong><span>ALPACA PAPER</span></div></div>
+    <div className="proof-flow" aria-label="Execution flow"><div><Scan /><b>01 · SCAN</b><strong>6 symbols</strong><span>One evidence pass each</span></div><i>→</i><div><ShieldCheck /><b>02 · GOVERN</b><strong>MSFT selected</strong><span>Highest eligible confidence</span></div><i>→</i><div><UserCheck /><b>03 · AUTHORIZE</b><strong>Human confirmed</strong><span>Exact $1.00 paper buy</span></div><i>→</i><div><PaperPlaneTilt /><b>04 · RECONCILE</b><strong>Broker filled</strong><span>One POST · no retry</span></div></div>
+    <div className="proof-grid">
+      <article className="scan-card"><header><div><span>FIXED UNIVERSE SCAN</span><strong>{verifiedExecution.evaluatedAt}</strong></div><em>ORDERLESS PREVIEW</em></header><div className="scan-head"><span>SYMBOL</span><span>PROPOSAL</span><span>CONFIDENCE</span><span>OUTCOME</span></div>{verifiedExecution.universe.map((row) => <div className={`scan-row ${row.status === "Selected" ? "selected" : ""}`} key={row.symbol}><strong>{row.symbol}</strong><b className={row.action.toLowerCase()}>{row.action}</b><span>{row.confidence}</span><em>{row.status === "Selected" && <CheckCircle weight="fill" />}{row.status}</em></div>)}<footer><Fingerprint /><span><b>DETERMINISTIC SELECTION</b>{verifiedExecution.selectionRule}</span></footer></article>
+      <article className="receipt-card"><header><span>VERIFIED BROKER RECEIPT</span><b><CheckCircle weight="fill" /> {receipt.status}</b></header><div className="receipt-trade"><div><span>SYMBOL</span><strong>{receipt.symbol}</strong></div><div><span>SIDE</span><strong className="buy">{receipt.side}</strong></div><div><span>NOTIONAL</span><strong>{receipt.notional}</strong></div></div><dl><div><dt>Filled quantity</dt><dd>{receipt.filledQuantity}</dd></div><div><dt>Average price</dt><dd>{receipt.averagePrice}</dd></div><div><dt>Filled at</dt><dd>{receipt.filledAt}</dd></div><div><dt>Order ID</dt><dd>{receipt.orderId}</dd></div><div><dt>Client order ID</dt><dd>{receipt.clientOrderId}</dd></div></dl><footer><LockKey weight="fill" /><span><b>PAPER ACCOUNT · SANITIZED</b>No credentials, balances or account identifiers are present.</span></footer></article>
+    </div>
+    <div className="proof-boundary"><ShieldCheck /><b>WHAT THIS PROVES</b><span>Fresh evidence → constrained AI proposal → deterministic policy → explicit human authorization → one reconciled Alpaca paper fill.</span><em>Not proof of profitability or unattended autonomy.</em></div>
+  </section>;
+}
+
 export function App() {
   const isHostedDemo = !["localhost", "127.0.0.1"].includes(window.location.hostname);
   const [caseName, setCaseName] = useState("rejected");
@@ -21,6 +36,7 @@ export function App() {
   const [liveLoading, setLiveLoading] = useState(false);
   const [apiData, setApiData] = useState(null);
   const [source, setSource] = useState("bundled synthetic fallback");
+  const [view, setView] = useState("proof");
   const data = apiData || fixtures[caseName];
   const failures = useMemo(() => data.guardrails.filter((item) => item.status !== "pass"), [data]);
   void failures;
@@ -76,12 +92,12 @@ export function App() {
     </header>
 
     <section className="demo-guide" aria-label="Demo guide">
-      <div className="demo-kicker"><b>PUBLIC DEMO</b><span>Two deterministic cases. Zero broker access.</span></div>
-      <ol><li><b>01</b><span>AI proposes</span></li><li><b>02</b><span>Rules evaluate</span></li><li><b>03</b><span>Verdict explains</span></li></ol>
+      <div className="demo-kicker"><b>PUBLIC DEMO</b><span>Verified proof. Zero broker controls.</span></div>
+      <div className="view-switch" role="tablist" aria-label="Demo view"><button role="tab" aria-selected={view === "proof"} onClick={() => setView("proof")}>Verified run</button><button role="tab" aria-selected={view === "cases"} onClick={() => setView("cases")}>Decision cases</button></div>
       <a href="https://github.com/goaty-93/goblin-guard" target="_blank" rel="noreferrer"><GithubLogo weight="fill" /> View source</a>
     </section>
 
-    <section className="workspace">
+    {view === "proof" ? <VerifiedRun /> : <><section className="workspace">
       <section className="proposal-panel">
         <div className="section-title"><FileText /><h2>Proposal</h2><div className="proposal-meta">ID: {data.id}<span></span><Clock /> 2m 14s ago</div></div>
         <article className="proposal-card">
@@ -105,7 +121,7 @@ export function App() {
       </aside>
     </section>
 
-    <section className="trace-section"><div className="trace-heading"><h3>Decision trace</h3><span className={`case-chip ${data.decision.toLowerCase()}`}>{data.decision === "REJECTED" ? "Rejection case" : "Resize case"}</span></div><div className="trace-grid"><div className="trace-table">{data.trace.map((row) => <div className={`trace-row ${row.status}`} key={`${row.time}-${row.event}`}><time>{row.time}</time><i></i><strong>{row.event}</strong><span>Guardrail Engine</span><b>{row.result}</b><em>{row.detail}</em></div>)}</div><div className="replay-stack"><button className="replay" onClick={replay} disabled={loading || liveLoading}><ArrowClockwise className={loading ? "spinning" : ""} /><strong>{loading ? "Re-evaluating…" : data.decision === "REJECTED" ? "Run approved resize" : "Run rejection case"}</strong><span>{data.decision === "REJECTED" ? "Fresh evidence passes the gates; the oversized request is reduced by policy." : "Stale evidence and the loss circuit breaker overrule the proposal."}</span></button>{!isHostedDemo && <button className="live-run" onClick={runLive} disabled={loading || liveLoading}>{liveLoading ? "Running read-only evaluation…" : "Run live read-only evaluation"}<small>Alpaca IEX → OpenAI proposal → governor</small></button>}</div></div></section>
+    <section className="trace-section"><div className="trace-heading"><h3>Decision trace</h3><span className={`case-chip ${data.decision.toLowerCase()}`}>{data.decision === "REJECTED" ? "Rejection case" : "Resize case"}</span></div><div className="trace-grid"><div className="trace-table">{data.trace.map((row) => <div className={`trace-row ${row.status}`} key={`${row.time}-${row.event}`}><time>{row.time}</time><i></i><strong>{row.event}</strong><span>Guardrail Engine</span><b>{row.result}</b><em>{row.detail}</em></div>)}</div><div className="replay-stack"><button className="replay" onClick={replay} disabled={loading || liveLoading}><ArrowClockwise className={loading ? "spinning" : ""} /><strong>{loading ? "Re-evaluating…" : data.decision === "REJECTED" ? "Run approved resize" : "Run rejection case"}</strong><span>{data.decision === "REJECTED" ? "Fresh evidence passes the gates; the oversized request is reduced by policy." : "Stale evidence and the loss circuit breaker overrule the proposal."}</span></button>{!isHostedDemo && <button className="live-run" onClick={runLive} disabled={loading || liveLoading}>{liveLoading ? "Running read-only evaluation…" : "Run live read-only evaluation"}<small>Alpaca IEX → OpenAI proposal → governor</small></button>}</div></div></section></>}
     <footer className="simulation-banner"><ShieldCheck /> {source.startsWith("live read-only") ? "LIVE READ-ONLY" : "SYNTHETIC REPLAY"} · {source.toUpperCase()} · NO ORDERS</footer>
   </main>;
 }
